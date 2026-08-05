@@ -1,0 +1,77 @@
+{
+  "title": "Choose the visual world (re-roll)",
+  "question": "Re-roll assigned Build Log Console. Prior directions are out. Keep this, take an alternate, re-roll again, or take the category standard.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Build Log Console",
+      "kicker": "THE ROLL",
+      "lineage": "make / ninja / cargo build logs with collapsible steps",
+      "thesis": "The agent session is a live build: steps, spinners, errors, and blocked targets—approvals are the steps that won't compile until you say so.",
+      "palette": ["#0d1117", "#c9d1d9", "#58a6ff", "#3fb950", "#d29922", "#f85149"],
+      "materials": ["monospaced step prefixes", "collapsible section folds", "spinner glyphs", "error-underline hierarchy"],
+      "viewport": "Vertical Claude Code–like stack: dim completed steps, bright active step with spinner, expanded tool body with paths, a blocked APPROVE step mid-stream, prompt docked bottom, thin status with cwd/model.",
+      "risk": "Can feel like CI noise if hierarchy fails and every tool line screams equally.",
+      "sketch": ".impeccable/sketches/assigned.webp",
+      "hero": null,
+      "board": null
+    },
+    {
+      "id": "challenger-telop",
+      "label": "Telop Field",
+      "kicker": "CHALLENGER",
+      "lineage": "variety-show telop / caption hierarchy",
+      "thesis": "Attention is typeset: fat outlined captions for gates, quiet gray mutter for tool chatter, gone when the beat ends.",
+      "palette": ["#111111", "#f5f5f5", "#ffe600", "#ff2a2a", "#8a8a8a"],
+      "materials": ["weight-as-priority type", "outline caption blocks", "corner mutter labels", "beat-timed presence"],
+      "viewport": "Dark stream; user/agent lines normal weight; tool noise small and gray; approval as a large yellow-outlined caption demanding y/n.",
+      "risk": "TV-caption energy can undercut trust for a serious local coding tool.",
+      "case": "Strong product clarity for signal vs noise; weaker engineer identification than a build-log world.",
+      "sketch": ".impeccable/sketches/challenger-telop.webp",
+      "hero": "https://impeccable.style/worlds/cards/variety-telop-caption-field-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/variety-telop-caption-field.webp"
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama Dawn",
+      "kicker": "CHALLENGER",
+      "lineage": "theater cyclorama lighting from black to day",
+      "thesis": "Session phase is light: plan is pre-dawn, tools gather color, approval is the cue before full day.",
+      "palette": ["#05060a", "#1b3a6b", "#c45c6a", "#f0d7a0", "#e8eef8"],
+      "materials": ["depthless black ground", "banded horizon color", "soft actor-shadow hierarchy", "cue-to-day transition"],
+      "viewport": "Near-black terminal; a low cobalt status band; rose accent on active agent work; approval cue brightens the field before completion day-wash.",
+      "risk": "Mood lighting can obscure scannable task state under rapid tool streams.",
+      "case": "Poetic phase map for plan→run; loses operate scanability against build-step grammar.",
+      "sketch": ".impeccable/sketches/challenger-cyclorama.webp",
+      "hero": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/stagecraft-theater-lighting-cyclorama-dawn.webp"
+    },
+    {
+      "id": "challenger-wpa",
+      "label": "Park Poster Inks",
+      "kicker": "CHALLENGER",
+      "lineage": "WPA / See America flat-ink posters",
+      "thesis": "Four flat inks only: monumental mode words, unbroken color fields, zero gradient chrome.",
+      "palette": ["#0e3d4a", "#2a9d8f", "#e9c46a", "#f4f1de", "#1d1d1d"],
+      "materials": ["flat ink planes", "block caps for gates", "no gradients", "poster margin discipline"],
+      "viewport": "Teal-dark field; block-cap PLAN / APPROVE / RUN as mode marks; cream body stream; gold only on the live gate.",
+      "risk": "Poster monumentality fights dense multi-line tool and diff content.",
+      "case": "Excellent palette discipline and mode clarity; weaker for continuous transcript density.",
+      "sketch": ".impeccable/sketches/challenger-wpa.webp",
+      "hero": "https://impeccable.style/worlds/cards/posters-covers-sleeves-wpa-park-poster-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/posters-covers-sleeves-wpa-park-poster.webp"
+    }
+  ],
+  "reroll": true,
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "Claude Code / Aider craft: dark monochrome stream, restrained accent, inline tools, bottom prompt—at full fidelity.",
+    "viewport": "Vertical stack transcript, status chrome, prompt docked bottom, tool blocks and diffs inline—familiar agent-CLI arrangement.",
+    "palette": ["#1e1e1e", "#d4d4d4", "#4ec9b0", "#ce9178", "#569cd6"],
+    "materials": ["monospace stream", "dim box drawing", "inline tool cards", "bottom prompt"],
+    "risk": "Safe and correct; easier to ship, harder to own a distinct world.",
+    "sketch": ".impeccable/sketches/canon.webp"
+  },
+  "steer": true
+}
