@@ -9,6 +9,7 @@ import (
 
 	"github.com/vnedyalk0v/exr-cli/internal/llm"
 	"github.com/vnedyalk0v/exr-cli/internal/session"
+	"github.com/vnedyalk0v/exr-cli/internal/strutil"
 	"github.com/vnedyalk0v/exr-cli/internal/tools"
 )
 
@@ -48,6 +49,10 @@ Plan mode means you must NOT call tools that write or run shell; only inspect an
 
 // RunTurn calls the model with tools until a final answer or cancel.
 func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Event) {
+	if r.Client == nil {
+		r.runDemo(ctx, userMsg, events)
+		return
+	}
 	r.Sess.ClearInterrupt()
 	r.Sess.SetAgentRunning(true)
 	defer r.Sess.SetAgentRunning(false)
@@ -125,7 +130,7 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 				if interrupted {
 					s.Target = "interrupted"
 					if !strings.Contains(s.Body, "interrupted by user") {
-						s.Body = appendLine(s.Body, "interrupted by user")
+						s.Body = strutil.AppendLine(s.Body, "interrupted by user")
 					}
 				} else {
 					s.Target = "model error"
@@ -212,12 +217,12 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 			name := tc.Function.Name
 			args := tc.Function.Arguments
 			target := toolTarget(name, args)
-			kind := session.Kind(tools.KindFromTool(name))
-			risk := tools.ToolRisk(name)
+			kind := toolKind(name)
+			risk := toolRisk(name)
 			perm := r.Sess.GetPerm()
 
 			// Plan mode: block writes/shell entirely (auto-deny with explanation)
-			if perm == session.PermPlan && risk != tools.RiskSafe {
+			if perm == session.PermPlan && risk != riskSafe {
 				body := fmt.Sprintf("tool: %s\nargs: %s\n\n(blocked: permission mode is plan — switch to ask/allow to execute)", name, prettyJSON(args))
 				idx := r.Sess.Append(session.Step{
 					Kind:             kind,
@@ -241,7 +246,7 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 				continue
 			}
 
-			needGate := perm == session.PermAsk && risk != tools.RiskSafe
+			needGate := perm == session.PermAsk && risk != riskSafe
 			status := session.StatusRunning
 			if needGate {
 				status = session.StatusBlocked
@@ -252,7 +257,7 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 				Status:           status,
 				Target:           target,
 				Body:             preview,
-				Expanded:         needGate || risk != tools.RiskSafe,
+				Expanded:         needGate || risk != riskSafe,
 				RequiresApproval: needGate,
 				ToolName:         name,
 				ToolArgs:         args,
@@ -275,7 +280,7 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 				if st.Approval == session.ApprovalDenied || st.Status == session.StatusDenied {
 					r.Sess.Update(idx, func(s *session.Step) {
 						s.Status = session.StatusDenied
-						s.Body = appendLine(s.Body, "# denied by user — not executed")
+						s.Body = strutil.AppendLine(s.Body, "# denied by user — not executed")
 					})
 					messages = append(messages, llm.Message{
 						Role:       llm.RoleTool,
@@ -320,7 +325,7 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 					if s.Status == session.StatusRunning || s.Status == session.StatusBlocked {
 						s.Status = session.StatusFailed
 						s.Duration = dur
-						s.Body = appendLine(s.Body, "interrupted by user")
+						s.Body = strutil.AppendLine(s.Body, "interrupted by user")
 						s.Expanded = true
 					}
 				})
@@ -369,10 +374,10 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 					}
 					s.Body = body
 					// keep edits expanded; collapse huge successful shell dumps
-					if risk == tools.RiskShell && strings.Count(body, "\n") > 40 {
+					if risk == riskShell && strings.Count(body, "\n") > 40 {
 						s.Expanded = false
 					} else {
-						s.Expanded = risk != tools.RiskSafe || len(body) < 2000
+						s.Expanded = risk != riskSafe || len(body) < 2000
 					}
 				})
 				messages = append(messages, llm.Message{
@@ -397,10 +402,10 @@ func (r *Runner) RunTurn(ctx context.Context, userMsg string, events chan<- Even
 	}
 
 	r.Sess.Append(session.Step{
-		Kind:   session.KindSystem,
-		Status: session.StatusFailed,
-		Target: "max rounds",
-		Body:   fmt.Sprintf("Stopped after %d tool rounds. Send another message to continue.", r.MaxRounds),
+		Kind:     session.KindSystem,
+		Status:   session.StatusFailed,
+		Target:   "max rounds",
+		Body:     fmt.Sprintf("Stopped after %d tool rounds. Send another message to continue.", r.MaxRounds),
 		Expanded: true,
 	})
 	send("done")
@@ -416,7 +421,7 @@ func waitApproval(ctx context.Context, sess *session.Session, idx int) bool {
 				if s.Status == session.StatusBlocked {
 					s.Status = session.StatusDenied
 					s.Approval = session.ApprovalDenied
-					s.Body = appendLine(s.Body, "interrupted by user — not executed")
+					s.Body = strutil.AppendLine(s.Body, "interrupted by user — not executed")
 				}
 			})
 			return false
@@ -442,7 +447,7 @@ func waitApproval(ctx context.Context, sess *session.Session, idx int) bool {
 				if s.Status == session.StatusBlocked {
 					s.Status = session.StatusDenied
 					s.Approval = session.ApprovalDenied
-					s.Body = appendLine(s.Body, "interrupted by user — not executed")
+					s.Body = strutil.AppendLine(s.Body, "interrupted by user — not executed")
 				}
 			})
 			return false
@@ -483,11 +488,11 @@ func toolTarget(name, argsJSON string) string {
 		}
 	case "run_shell":
 		if c, ok := m["command"].(string); ok {
-			return truncate(c, 72)
+			return strutil.Truncate(c, 72)
 		}
 	case "search_code":
 		if q, ok := m["query"].(string); ok {
-			return "/" + truncate(q, 40) + "/"
+			return "/" + strutil.Truncate(q, 40) + "/"
 		}
 	case "find_files":
 		if p, ok := m["pattern"].(string); ok {
@@ -513,17 +518,34 @@ func prettyJSON(s string) string {
 	return string(b)
 }
 
-func appendLine(body, line string) string {
-	if body == "" {
-		return line
+const (
+	riskSafe  = 0
+	riskWrite = 1
+	riskShell = 2
+)
+
+func toolRisk(name string) int {
+	switch name {
+	case "str_replace", "write_file":
+		return riskWrite
+	case "run_shell":
+		return riskShell
+	default:
+		return riskSafe
 	}
-	return body + "\n" + line
 }
 
-func truncate(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
+func toolKind(name string) session.Kind {
+	switch name {
+	case "read_file":
+		return session.KindRead
+	case "list_dir", "find_files", "search_code":
+		return session.KindSearch
+	case "str_replace", "write_file":
+		return session.KindEdit
+	case "run_shell":
+		return session.KindShell
+	default:
+		return session.KindShell
 	}
-	return string(r[:n-1]) + "…"
 }

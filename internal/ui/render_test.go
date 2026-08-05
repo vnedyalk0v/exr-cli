@@ -10,6 +10,25 @@ import (
 	"github.com/vnedyalk0v/exr-cli/internal/session"
 )
 
+func stripANSI(s string) string {
+	var b strings.Builder
+	inEsc := false
+	for _, r := range s {
+		if r == 0x1b {
+			inEsc = true
+			continue
+		}
+		if inEsc {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+				inEsc = false
+			}
+			continue
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
+}
+
 func TestCountLines(t *testing.T) {
 	cases := []struct {
 		in   string
@@ -57,7 +76,7 @@ func TestRenderStreamOffsetsMonotonic(t *testing.T) {
 		Kind: session.KindEdit, Status: session.StatusBlocked, RequiresApproval: true,
 		Target: "a.go", Body: "--- a\n+++ b\n+ok\n",
 	})
-	m := New(sess, Options{Live: false, Backends: "rg · fd"})
+	m := New(sess, nil, false, "rg · fd")
 	m.width = 80
 	m.height = 40
 	m.ready = true
@@ -87,7 +106,7 @@ func TestRenderStreamOffsetsMonotonic(t *testing.T) {
 
 func TestWelcomeAndNarrowPrompt(t *testing.T) {
 	sess := session.New("gpt-4o-mini")
-	m := New(sess, Options{Live: true, Backends: "rg · fd"})
+	m := New(sess, nil, true, "rg · fd")
 	m.width = 40
 	m.height = 24
 	m.ready = true
@@ -108,7 +127,7 @@ func TestWelcomeAndNarrowPrompt(t *testing.T) {
 
 func TestPromptBoxFitsTerminalWidth(t *testing.T) {
 	sess := session.New("gpt-4o-mini")
-	m := New(sess, Options{Live: true, Backends: "rg · fd"})
+	m := New(sess, nil, true, "rg · fd")
 	for _, w := range []int{40, 60, 80, 120} {
 		m.width = w
 		m.height = 30
@@ -128,7 +147,7 @@ func TestPromptBoxFitsTerminalWidth(t *testing.T) {
 
 func TestPromptChipsPresentOnWide(t *testing.T) {
 	sess := session.New("gpt-4o-mini")
-	m := New(sess, Options{Live: true, Backends: "rg"})
+	m := New(sess, nil, true, "rg")
 	m.width = 100
 	m.height = 30
 	m.ready = true
@@ -144,7 +163,7 @@ func TestPromptChipsPresentOnWide(t *testing.T) {
 }
 
 func TestRenderUserWraps(t *testing.T) {
-	m := New(session.New("m"), Options{})
+	m := New(session.New("m"), nil, false, "")
 	m.width = 40
 	long := strings.Repeat("word ", 40)
 	out := m.renderUser(session.Step{Kind: session.KindUser, Target: long}, 40)
@@ -164,7 +183,7 @@ func TestFormatDur(t *testing.T) {
 
 func TestViewDoesNotPanic(t *testing.T) {
 	sess := session.New("m")
-	m := New(sess, Options{Live: false, Backends: "rg"})
+	m := New(sess, nil, false, "rg")
 	// not ready
 	_ = m.View()
 	m.width = 100

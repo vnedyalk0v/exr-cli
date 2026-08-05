@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/vnedyalk0v/exr-cli/internal/strutil"
 	"io"
 	"net/http"
 	"strings"
@@ -63,8 +64,8 @@ type FunctionCall struct {
 
 // ToolDef is an OpenAI tools[] entry.
 type ToolDef struct {
-	Type     string             `json:"type"`
-	Function ToolDefFunction    `json:"function"`
+	Type     string          `json:"type"`
+	Function ToolDefFunction `json:"function"`
 }
 
 // ToolDefFunction describes a function tool.
@@ -144,23 +145,16 @@ func (c *Client) Chat(ctx context.Context, messages []Message, tools []ToolDef) 
 	}
 	var out ChatResponse
 	if err := json.Unmarshal(body, &out); err != nil {
-		return nil, fmt.Errorf("llm: decode: %w\nbody: %s", err, truncate(string(body), 400))
+		return nil, fmt.Errorf("llm: decode: %w\nbody: %s", err, strutil.Truncate(string(body), 400))
 	}
 	if out.Error != nil && out.Error.Message != "" {
 		return nil, fmt.Errorf("llm: %s", out.Error.Message)
 	}
 	if res.StatusCode >= 300 {
-		return nil, fmt.Errorf("llm: HTTP %d: %s", res.StatusCode, truncate(string(body), 400))
+		return nil, fmt.Errorf("llm: HTTP %d: %s", res.StatusCode, strutil.Truncate(string(body), 400))
 	}
 	if len(out.Choices) == 0 {
 		return nil, fmt.Errorf("llm: empty choices")
 	}
 	return &out, nil
-}
-
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n] + "…"
 }

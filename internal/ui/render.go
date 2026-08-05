@@ -215,23 +215,3 @@ func permHelp(p session.PermissionMode) string {
 		return "ask: reads auto; edits and shell need y/n."
 	}
 }
-
-// stripANSI is used in tests to measure visible content.
-func stripANSI(s string) string {
-	var b strings.Builder
-	inEsc := false
-	for _, r := range s {
-		if r == 0x1b {
-			inEsc = true
-			continue
-		}
-		if inEsc {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
-				inEsc = false
-			}
-			continue
-		}
-		b.WriteRune(r)
-	}
-	return b.String()
-}

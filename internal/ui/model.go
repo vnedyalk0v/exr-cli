@@ -23,13 +23,10 @@ const (
 	stickyHeight  = 1
 )
 
-// TurnFunc runs one agent turn (demo or live).
-type TurnFunc func(ctx context.Context, userMsg string, events chan<- agent.Event)
-
 // Model is the Grok Build–inspired session TUI.
 type Model struct {
 	sess       *session.Session
-	runTurn    TurnFunc
+	runTurn    func(context.Context, string, chan<- agent.Event)
 	live       bool
 	backends   string
 	input      textinput.Model
@@ -46,20 +43,12 @@ type Model struct {
 	cancel     context.CancelFunc
 	evCh       chan agent.Event
 	// turning is set synchronously in submit so Esc→re-submit cannot overlap turns.
-	turning bool
-	// spinFrame cached so non-running renders stay stable
+	turning   bool
 	spinFrame string
 }
 
-// Options configure the UI.
-type Options struct {
-	RunTurn  TurnFunc
-	Live     bool
-	Backends string
-}
-
 // New constructs the session UI.
-func New(sess *session.Session, opt Options) Model {
+func New(sess *session.Session, runTurn func(context.Context, string, chan<- agent.Event), live bool, backends string) Model {
 	ti := textinput.New()
 	// Grok Build: "> " in prompt; pure bg (no soft fill — that caused the gray bar).
 	ti.Prompt = "> "
@@ -78,9 +67,9 @@ func New(sess *session.Session, opt Options) Model {
 
 	return Model{
 		sess:       sess,
-		runTurn:    opt.RunTurn,
-		live:       opt.Live,
-		backends:   opt.Backends,
+		runTurn:    runTurn,
+		live:       live,
+		backends:   backends,
 		input:      ti,
 		spin:       sp,
 		cursor:     -1,
@@ -652,9 +641,6 @@ func (m Model) renderPromptBox(meta session.Meta) string {
 	line := field + strings.Repeat(" ", pad) + chips
 	if lw := lipgloss.Width(line); lw < contentW {
 		line += strings.Repeat(" ", contentW-lw)
-	} else if lw > contentW {
-		// hard clip visual overflow (safety)
-		line = truncateRunes(stripANSI(line), contentW)
 	}
 	return promptBorder.Width(boxInner).Render(line)
 }

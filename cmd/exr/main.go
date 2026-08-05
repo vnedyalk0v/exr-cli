@@ -31,39 +31,24 @@ func run() error {
 	}
 	toolRunner := tools.NewRunner(ws)
 
+	live := cfg.Live()
 	modelName := cfg.Model
-	if !cfg.Live() {
+	if !live {
 		modelName = "demo-synthetic"
+		fmt.Fprintln(os.Stderr, "exr: demo mode (no OPENAI_API_KEY). Export a key for live OpenAI-compatible calls.")
+		fmt.Fprintf(os.Stderr, "exr: search backends: %s\n", toolRunner.BackendInfo())
 	}
 
 	sess := session.New(modelName)
 	sess.CWD = ws.Root
 	sess.SetPerm(cfg.Perm)
 
-	var turn ui.TurnFunc
-	live := cfg.Live()
+	runner := &agent.Runner{Sess: sess, Tools: toolRunner, MaxRounds: 12}
 	if live {
-		client := llm.NewClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
-		runner := &agent.Runner{
-			Sess:      sess,
-			Client:    client,
-			Tools:     toolRunner,
-			MaxRounds: 12,
-		}
-		turn = runner.RunTurn
-	} else {
-		demo := &agent.DemoRunner{Sess: sess}
-		turn = demo.RunTurn
-		fmt.Fprintln(os.Stderr, "exr: demo mode (no OPENAI_API_KEY). Export a key for live OpenAI-compatible calls.")
-		fmt.Fprintf(os.Stderr, "exr: search backends: %s\n", toolRunner.BackendInfo())
+		runner.Client = llm.NewClient(cfg.APIKey, cfg.BaseURL, cfg.Model)
 	}
 
-	m := ui.New(sess, ui.Options{
-		RunTurn:  turn,
-		Live:     live,
-		Backends: toolRunner.BackendInfo(),
-	})
-
+	m := ui.New(sess, runner.RunTurn, live, toolRunner.BackendInfo())
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err = p.Run()
 	return err

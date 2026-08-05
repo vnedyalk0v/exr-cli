@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/vnedyalk0v/exr-cli/internal/strutil"
 )
 
 // Session is the live build-log state for one agent run.
@@ -140,11 +142,11 @@ func (s *Session) Interrupt() {
 		switch s.Steps[i].Status {
 		case StatusRunning:
 			s.Steps[i].Status = StatusFailed
-			s.Steps[i].Body = appendBody(s.Steps[i].Body, "interrupted by user")
+			s.Steps[i].Body = strutil.AppendLine(s.Steps[i].Body, "interrupted by user")
 		case StatusBlocked:
 			s.Steps[i].Status = StatusDenied
 			s.Steps[i].Approval = ApprovalDenied
-			s.Steps[i].Body = appendBody(s.Steps[i].Body, "interrupted by user — not executed")
+			s.Steps[i].Body = strutil.AppendLine(s.Steps[i].Body, "interrupted by user — not executed")
 		}
 	}
 }
@@ -252,11 +254,4 @@ func (s *Session) MarkSynthetic() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.Synthetic = true
-}
-
-func appendBody(body, line string) string {
-	if body == "" {
-		return line
-	}
-	return body + "\n" + line
 }

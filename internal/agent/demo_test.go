@@ -10,12 +10,12 @@ import (
 
 func TestDemoTurnApprovePath(t *testing.T) {
 	sess := session.New("test")
-	d := &DemoRunner{Sess: sess}
+	r := &Runner{Sess: sess} // Client nil → demo
 	ev := make(chan Event, 16)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go d.RunTurn(ctx, "fix the prompt", ev)
+	go r.RunTurn(ctx, "fix the prompt", ev)
 
 	deadline := time.After(5 * time.Second)
 	for {
@@ -29,7 +29,6 @@ func TestDemoTurnApprovePath(t *testing.T) {
 			if e.Kind == "blocked" {
 				idx := sess.FirstBlocked()
 				if idx < 0 {
-					// may have been approved already
 					continue
 				}
 				ApproveStep(sess, idx)

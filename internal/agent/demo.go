@@ -8,20 +8,15 @@ import (
 	"time"
 
 	"github.com/vnedyalk0v/exr-cli/internal/session"
+	"github.com/vnedyalk0v/exr-cli/internal/strutil"
 )
 
-// DemoRunner plays a fixed synthetic agent turn for harness UX development.
-// All content is synthetic — not a real model call.
-type DemoRunner struct {
-	Sess *session.Session
-}
-
-// RunTurn executes a labeled synthetic plan → tools → approve → result flow.
-func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- Event) {
-	d.Sess.MarkSynthetic()
-	d.Sess.ClearInterrupt()
-	d.Sess.SetAgentRunning(true)
-	defer d.Sess.SetAgentRunning(false)
+// runDemo is the offline synthetic turn (no API key).
+func (r *Runner) runDemo(ctx context.Context, userMsg string, events chan<- Event) {
+	r.Sess.MarkSynthetic()
+	r.Sess.ClearInterrupt()
+	r.Sess.SetAgentRunning(true)
+	defer r.Sess.SetAgentRunning(false)
 
 	send := func(kind string) {
 		ev := Event{Kind: kind}
@@ -44,7 +39,7 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		return
 	}
 
-	planIdx := d.Sess.Append(session.Step{
+	planIdx := r.Sess.Append(session.Step{
 		Kind:      session.KindPlan,
 		Status:    session.StatusRunning,
 		Target:    "turn plan",
@@ -57,15 +52,15 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		send("done")
 		return
 	}
-	d.Sess.Update(planIdx, func(s *session.Step) {
+	r.Sess.Update(planIdx, func(s *session.Step) {
 		s.Status = session.StatusDone
 		s.Duration = 400 * time.Millisecond
 		s.Expanded = false
 	})
-	d.Sess.AddTokens(120, 40)
+	r.Sess.AddTokens(120, 40)
 	send("tick")
 
-	thinkIdx := d.Sess.Append(session.Step{
+	thinkIdx := r.Sess.Append(session.Step{
 		Kind:      session.KindThink,
 		Status:    session.StatusRunning,
 		Target:    "approach",
@@ -77,13 +72,13 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		send("done")
 		return
 	}
-	d.Sess.Update(thinkIdx, func(s *session.Step) {
+	r.Sess.Update(thinkIdx, func(s *session.Step) {
 		s.Status = session.StatusDone
 		s.Duration = 300 * time.Millisecond
 	})
 	send("tick")
 
-	readIdx := d.Sess.Append(session.Step{
+	readIdx := r.Sess.Append(session.Step{
 		Kind:      session.KindRead,
 		Status:    session.StatusRunning,
 		Target:    "cmd/exr/main.go",
@@ -96,7 +91,7 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		send("done")
 		return
 	}
-	d.Sess.Update(readIdx, func(s *session.Step) {
+	r.Sess.Update(readIdx, func(s *session.Step) {
 		s.Status = session.StatusDone
 		s.Duration = 80 * time.Millisecond
 		s.Expanded = false
@@ -104,7 +99,7 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 	send("tick")
 
 	diff := syntheticDiff()
-	editIdx := d.Sess.Append(session.Step{
+	editIdx := r.Sess.Append(session.Step{
 		Kind:             session.KindEdit,
 		Status:           session.StatusBlocked,
 		Target:           "cmd/exr/main.go  +3 −1",
@@ -116,17 +111,17 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 	})
 	send("blocked")
 
-	if !waitApproval(ctx, d.Sess, editIdx) {
+	if !waitApproval(ctx, r.Sess, editIdx) {
 		send("done")
 		return
 	}
-	st, _ := d.Sess.StepAt(editIdx)
+	st, _ := r.Sess.StepAt(editIdx)
 	if st.Approval == session.ApprovalDenied || st.Status == session.StatusDenied {
-		d.Sess.Update(editIdx, func(s *session.Step) {
+		r.Sess.Update(editIdx, func(s *session.Step) {
 			s.Status = session.StatusDenied
-			s.Body = appendLine(s.Body, "# denied by user — not executed")
+			s.Body = strutil.AppendLine(s.Body, "# denied by user — not executed")
 		})
-		d.Sess.Append(session.Step{
+		r.Sess.Append(session.Step{
 			Kind:      session.KindResult,
 			Status:    session.StatusDone,
 			Target:    "stopped — edit denied",
@@ -137,21 +132,21 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		return
 	}
 	// synthetic apply (do not clobber interrupt)
-	d.Sess.Update(editIdx, func(s *session.Step) {
+	r.Sess.Update(editIdx, func(s *session.Step) {
 		if s.Status == session.StatusDenied || s.Status == session.StatusFailed {
 			return
 		}
 		s.Status = session.StatusDone
 		s.Duration = 40 * time.Millisecond
-		s.Body = appendLine(s.Body, "\n# approved — patch applied (synthetic, no disk write)")
+		s.Body = strutil.AppendLine(s.Body, "\n# approved — patch applied (synthetic, no disk write)")
 	})
-	if meta, _ := d.Sess.Snapshot(); meta.Interrupted || ctx.Err() != nil {
+	if meta, _ := r.Sess.Snapshot(); meta.Interrupted || ctx.Err() != nil {
 		send("done")
 		return
 	}
 	send("tick")
 
-	shellIdx := d.Sess.Append(session.Step{
+	shellIdx := r.Sess.Append(session.Step{
 		Kind:             session.KindShell,
 		Status:           session.StatusBlocked,
 		Target:           "go test ./...",
@@ -163,17 +158,17 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 	})
 	send("blocked")
 
-	if !waitApproval(ctx, d.Sess, shellIdx) {
+	if !waitApproval(ctx, r.Sess, shellIdx) {
 		send("done")
 		return
 	}
-	st, _ = d.Sess.StepAt(shellIdx)
+	st, _ = r.Sess.StepAt(shellIdx)
 	if st.Approval == session.ApprovalDenied || st.Status == session.StatusDenied {
-		d.Sess.Update(shellIdx, func(s *session.Step) {
+		r.Sess.Update(shellIdx, func(s *session.Step) {
 			s.Status = session.StatusDenied
-			s.Body = appendLine(s.Body, "# denied by user — not executed")
+			s.Body = strutil.AppendLine(s.Body, "# denied by user — not executed")
 		})
-		d.Sess.Append(session.Step{
+		r.Sess.Append(session.Step{
 			Kind:      session.KindResult,
 			Status:    session.StatusDone,
 			Target:    "edit applied; tests skipped",
@@ -183,7 +178,7 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		send("done")
 		return
 	}
-	d.Sess.Update(shellIdx, func(s *session.Step) {
+	r.Sess.Update(shellIdx, func(s *session.Step) {
 		if s.Status == session.StatusDenied || s.Status == session.StatusFailed {
 			return
 		}
@@ -191,7 +186,7 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		s.Duration = 180 * time.Millisecond
 		s.Body = "$ go test ./...\nok  \tgithub.com/vnedyalk0v/exr-cli/internal/session\t0.12s\n(synthetic — not really executed)\n"
 	})
-	if meta, _ := d.Sess.Snapshot(); meta.Interrupted || ctx.Err() != nil {
+	if meta, _ := r.Sess.Snapshot(); meta.Interrupted || ctx.Err() != nil {
 		send("done")
 		return
 	}
@@ -202,15 +197,15 @@ func (d *DemoRunner) RunTurn(ctx context.Context, userMsg string, events chan<- 
 		return
 	}
 
-	d.Sess.Append(session.Step{
+	r.Sess.Append(session.Step{
 		Kind:      session.KindResult,
 		Status:    session.StatusDone,
 		Target:    "turn complete (synthetic)",
-		Body:      fmt.Sprintf("Responded to: %q\nNo real model or filesystem writes were performed.\nSet OPENAI_API_KEY for live mode.", truncate(userMsg, 80)),
+		Body:      fmt.Sprintf("Responded to: %q\nNo real model or filesystem writes were performed.\nSet OPENAI_API_KEY for live mode.", strutil.Truncate(userMsg, 80)),
 		Expanded:  true,
 		Synthetic: true,
 	})
-	d.Sess.AddTokens(80, 120)
+	r.Sess.AddTokens(80, 120)
 	send("done")
 }
 
@@ -221,7 +216,7 @@ func planBody(userMsg string) string {
 		"3. Run tests if applicable (gated)",
 		"4. Summarize result",
 		"",
-		"user: " + truncate(userMsg, 120),
+		"user: " + strutil.Truncate(userMsg, 120),
 		"(synthetic plan — not a real model)",
 	}, "\n")
 }

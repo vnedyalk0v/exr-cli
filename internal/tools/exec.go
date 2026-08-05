@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/vnedyalk0v/exr-cli/internal/strutil"
 	"io"
 	"io/fs"
 	"os"
@@ -526,7 +527,7 @@ func (r *Runner) runShell(ctx context.Context, args map[string]any) Result {
 			header += "(error: " + err.Error() + ")\n"
 		}
 	}
-	return Result{OK: ok, Output: header + out, Target: truncate(command, 60)}
+	return Result{OK: ok, Output: header + out, Target: strutil.Truncate(command, 60)}
 }
 
 func (r *Runner) runCmd(ctx context.Context, timeout time.Duration, name string, args ...string) (string, error) {
@@ -542,9 +543,9 @@ func (r *Runner) runCmd(ctx context.Context, timeout time.Duration, name string,
 }
 
 type limitedWriter struct {
-	w       io.Writer
-	n       int
-	written int
+	w         io.Writer
+	n         int
+	written   int
 	truncated bool
 }
 
@@ -598,12 +599,4 @@ func unifiedSnippet(path, oldS, newS string) string {
 		b.WriteByte('\n')
 	}
 	return b.String()
-}
-
-func truncate(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
-		return s
-	}
-	return string(r[:n-1]) + "…"
 }
